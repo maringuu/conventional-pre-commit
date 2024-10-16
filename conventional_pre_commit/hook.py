@@ -1,4 +1,5 @@
 import argparse
+import subprocess as sp
 import sys
 
 from conventional_pre_commit import format
@@ -51,6 +52,12 @@ def main(argv=[]):
         action="store_true",
         help="Force commit to strictly follow Conventional Commits formatting. Disallows fixup! style commits.",
     )
+    parser.add_argument(
+        "--edit",
+        help="Reopen the commit message editor on failure.",
+        action="store_true",
+        default=False,
+    )
 
     if len(argv) < 1:
         argv = sys.argv[1:]
@@ -73,7 +80,8 @@ def main(argv=[]):
 
     if format.is_conventional(message, args.types, args.optional_scope, scopes):
         return RESULT_SUCCESS
-    else:
+
+    if not args.edit:
         print(
             f"""
         {Colors.LRED}[Bad Commit message] >>{Colors.RESTORE} {message}
@@ -105,6 +113,44 @@ def main(argv=[]):
             """
         )
         return RESULT_FAIL
+
+    editor = sp.run(
+        [
+            "git",
+            "var",
+            "GIT_EDITOR",
+        ],
+        capture_output=True,
+        text=True,
+    ).stdout.rstrip("\n")
+
+    while True:
+        message = read_message_or_exit(args.input)
+        if format.is_conventional(message, args.types, args.optional_scope, scopes):
+            return RESULT_SUCCESS
+
+        with open(args.input, "wt") as f:
+            f.write(
+                f"""# Your commit message does not follow Conventional Commits formatting
+# https://www.conventionalcommits.org/
+
+# Conventional Commits start with one of the below types, followed by a colon,
+# followed by the commit subject and an optional body seperated by a blank line:
+
+#     {" ".join(format.conventional_types(args.types))}
+#
+#     Please edit the message to follow Conventional Commits below and remove this header.""",
+            )
+
+            f.write(message)
+
+        _ = sp.run(
+            [
+                editor,
+                args.input,
+            ],
+            check=False,
+        )
 
 
 if __name__ == "__main__":
