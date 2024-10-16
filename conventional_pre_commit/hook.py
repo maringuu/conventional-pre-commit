@@ -14,6 +14,23 @@ class Colors:
     YELLOW = "\033[00;33m"
 
 
+def read_message_or_exit(message_path: str) -> str:
+    try:
+        with open(message_path, encoding="utf-8") as f:
+            return f.read()
+    except UnicodeDecodeError:
+        print(
+            f"""
+{Colors.LRED}[Bad Commit message encoding] {Colors.RESTORE}
+
+{Colors.YELLOW}conventional-pre-commit couldn't decode your commit message.{Colors.RESTORE}
+{Colors.YELLOW}UTF-8{Colors.RESTORE} encoding is assumed, please configure git to write commit messages in UTF-8.
+See {Colors.LBLUE}https://git-scm.com/docs/git-commit/#_discussion{Colors.RESTORE} for more.
+        """
+        )
+        raise SystemExit(RESULT_FAIL)
+
+
 def main(argv=[]):
     parser = argparse.ArgumentParser(
         prog="conventional-pre-commit", description="Check a git commit message for Conventional Commits formatting."
@@ -43,20 +60,8 @@ def main(argv=[]):
     except SystemExit:
         return RESULT_FAIL
 
-    try:
-        with open(args.input, encoding="utf-8") as f:
-            message = f.read()
-    except UnicodeDecodeError:
-        print(
-            f"""
-{Colors.LRED}[Bad Commit message encoding] {Colors.RESTORE}
+    message = read_message_or_exit(args.input)
 
-{Colors.YELLOW}conventional-pre-commit couldn't decode your commit message.{Colors.RESTORE}
-{Colors.YELLOW}UTF-8{Colors.RESTORE} encoding is assumed, please configure git to write commit messages in UTF-8.
-See {Colors.LBLUE}https://git-scm.com/docs/git-commit/#_discussion{Colors.RESTORE} for more.
-        """
-        )
-        return RESULT_FAIL
     if args.scopes:
         scopes = args.scopes.split(",")
     else:
